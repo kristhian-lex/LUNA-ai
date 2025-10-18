@@ -1,0 +1,7 @@
+# Ignore Python virtual environment
+venv/
+__pycache__/
+
+# Ignore secret files
+.env
+firebase-credentials.json
