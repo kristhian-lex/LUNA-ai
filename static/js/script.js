@@ -16,12 +16,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const imagePreview = document.getElementById('image-preview');
     const removeImageBtn = document.getElementById('remove-image-btn');
 
+    // Elements for profile dropdown
+    const profileBtn = document.getElementById('profile-btn');
+    const profileDropdown = document.getElementById('profile-dropdown');
+
     let currentChatId = null;
     let attachedFile = null;
 
     // --- All Helper Functions ---
     const promptSuggestions = ["What are you working on?", "Ready when you are.", "What’s on the agenda today?", "Explain a complex topic simply.", "Let's brainstorm some ideas.", "Help me write a Python script.", "What's a fun fact you know?", "How can I be more productive?"];
     
+
+    const copyToClipboard = (text) => {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed'; // Prevent scrolling to bottom of page in MS Edge.
+        textarea.style.opacity = 0;
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        try {
+            document.execCommand('copy');
+        } catch (err) {
+            console.error('Fallback: Oops, unable to copy', err);
+        }
+        document.body.removeChild(textarea);
+    };
+
+
     const setRandomPrompt = () => {
         const promptElement = document.getElementById('random-prompt');
         if (promptElement) {
@@ -58,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
             copyButton.innerHTML = `<svg><use href="#icon-copy"></use></svg> Copy`;
             copyButton.addEventListener('click', () => {
                 const code = codeBlock.querySelector('code').innerText;
-                navigator.clipboard.writeText(code);
+                copyToClipboard(code);
                 copyButton.innerHTML = `✓ Copied!`;
                 copyButton.classList.add('copied');
                 setTimeout(() => {
@@ -76,14 +98,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const welcomeScreen = chatMessages.querySelector('.welcome-screen');
         if (welcomeScreen) chatMessages.innerHTML = '';
+        document.getElementById('chat-header').style.display = 'block';
         
         const messageElement = document.createElement('div');
         messageElement.classList.add('message', `${sender}-message`);
         if (messageId) messageElement.dataset.messageId = messageId;
         
-        const avatar = document.createElement('div');
-        avatar.classList.add('avatar');
-        avatar.textContent = sender === 'user' ? 'You' : 'L';
         
         const messageContent = document.createElement('div');
         messageContent.classList.add('message-content');
@@ -106,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
             bubbleWrapper.classList.add('bubble-wrapper');
             messageContent.innerHTML += marked.parse(text);
             bubbleWrapper.appendChild(messageContent);
-            messageElement.append(avatar, bubbleWrapper);
+            messageElement.append(bubbleWrapper);
         } else { // User message
             const p = document.createElement('p');
             p.textContent = text;
@@ -114,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const editBtn = document.createElement('button');
             editBtn.classList.add('edit-btn');
             editBtn.innerHTML = `<svg><use href="#icon-edit"></use></svg>`;
-            messageElement.append(messageContent, avatar, editBtn);
+            messageElement.append(messageContent, editBtn);
         }
         chatMessages.appendChild(messageElement);
         chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -203,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     copyBtn.title = 'Copy message';
                     copyBtn.innerHTML = `<svg><use href="#icon-copy"></use></svg>`;
                     copyBtn.addEventListener('click', () => {
-                        navigator.clipboard.writeText(contentDiv.innerText);
+                        copyToClipboard(contentDiv.innerText);
                         copyBtn.classList.add('copied');
                         setTimeout(() => { copyBtn.classList.remove('copied'); }, 2000);
                     });
@@ -295,21 +315,66 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const loadSpecificChat = async(chatId) => {
         if (!chatId) return;
-        if (currentChatId === chatId && chatMessages.children.length > 1) return;
+        // This check is slightly modified to allow force-reloading
+        if (currentChatId === chatId && chatMessages.children.length > 1 && !forceReload) {
+             return;
+        }
         currentChatId = chatId;
         localStorage.setItem('activeChatId', chatId);
         try {
             const response = await fetch(`/get_chat/${chatId}`);
             const messages = await response.json();
+            
+            // Show the header if it's hidden
+            const chatHeader = document.getElementById('chat-header');
+            if (messages && messages.length > 0) {
+                 if(chatHeader) chatHeader.style.display = 'block';
+            } else {
+                 if(chatHeader) chatHeader.style.display = 'none';
+            }
+            
             chatMessages.innerHTML = '';
+            
             if (messages && messages.length > 0) {
                 messages.forEach(msg => {
                     let fileInfo = msg.file || null;
                     if(fileInfo && msg.image) {
                         fileInfo.imageSrc = msg.image;
                     }
-                    addMessage(msg.role === 'model' ? 'luna' : 'user', msg.parts[0], msg.id, fileInfo);
+                    // The addMessage function already returns the created element
+                    const messageElement = addMessage(msg.role === 'model' ? 'luna' : 'user', msg.parts[0], msg.id, fileInfo);
+
+                    // After adding the message, find its content and add buttons if it's a LUNA message
+                    if (msg.role === 'model') {
+                        const contentDiv = messageElement.querySelector('.message-content');
+                        if (contentDiv) {
+                            // 1. Add copy buttons to code blocks
+                            addCopyButtons(contentDiv);
+
+                            // 2. Add the hover copy button for regular text
+                            if (!contentDiv.querySelector('pre')) {
+                                const bubbleWrapper = messageElement.querySelector('.bubble-wrapper');
+                                // Prevent adding duplicate buttons
+                                if (bubbleWrapper && !bubbleWrapper.querySelector('.message-actions')) {
+                                    const actionsWrapper = document.createElement('div');
+                                    actionsWrapper.classList.add('message-actions');
+                                    const copyBtn = document.createElement('button');
+                                    copyBtn.classList.add('action-btn', 'copy-text-btn');
+                                    copyBtn.title = 'Copy message';
+                                    copyBtn.innerHTML = `<svg><use href="#icon-copy"></use></svg>`;
+                                    copyBtn.addEventListener('click', () => {
+                                        copyToClipboard(contentDiv.innerText);
+                                        copyBtn.classList.add('copied');
+                                        setTimeout(() => { copyBtn.classList.remove('copied'); }, 2000);
+                                    });
+                                    actionsWrapper.appendChild(copyBtn);
+                                    bubbleWrapper.appendChild(actionsWrapper);
+                                }
+                            }
+                        }
+                    }
                 });
+
                 const allLunaMessages = chatMessages.querySelectorAll('.luna-message');
                 if (allLunaMessages.length > 0) {
                     allLunaMessages[allLunaMessages.length - 1].classList.add('latest-luna-message');
@@ -511,9 +576,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (existingFileName) existingFileName.remove();
         fileUploadInput.value = '';
     });
-menuToggleBtn.addEventListener('click', () => {
+
+
+    // --- Profile Dropdown Logic ---
+    if (profileBtn) {
+        profileBtn.addEventListener('click', (event) => {
+            event.stopPropagation(); // Prevent click from bubbling up to the window
+            profileDropdown.classList.toggle('show');
+        });
+    }
+
+    // Close the dropdown if the user clicks outside of it
+    window.addEventListener('click', (event) => {
+        if (profileDropdown && profileDropdown.classList.contains('show')) {
+            if (!profileBtn.contains(event.target)) {
+                 profileDropdown.classList.remove('show');
+            }
+        }
+    });
+
+
+    menuToggleBtn.addEventListener('click', () => {
         body.classList.toggle('sidebar-open');
     });
+
+    
 
     // --- Mobile Gesture Logic ---
     chatContainer.addEventListener('click', (event) => {

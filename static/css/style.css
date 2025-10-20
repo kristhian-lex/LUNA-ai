@@ -1,17 +1,17 @@
 /* --- Color Variables --- */
 :root {
-     --primary-bg: #22252a; /* Main dark background */
-    --sidebar-bg: #292c31; /* Slightly lighter dark for sidebar */
-    --text-color: #e0e0e0; /* Light text for dark background */
-    --secondary-text-color: #a0a0a0; /* Muted text */
-    --border-color: #3b3f46; /* Darker border for contrast */
-    --user-msg-bg: #4a4d52; /* User message bubble in dark grey */
-    --luna-msg-bg: #5a5e63; /* LUNA message bubble, slightly different grey */
-    /* Colors from the LUNA logo for accents */
+    --primary-bg: #22252a;
+    --sidebar-bg: #292c31;
+    --text-color: #e0e0e0;
+    --secondary-text-color: #a0a0a0;
+    --border-color: #3b3f46;
+    --user-msg-bg: #4a4d52;
+    --luna-msg-bg: #5a5e63;
     --luna-purple: #3e3860;
     --luna-yellow: #f8e18c;
-    --luna-dark-purple: #2c2940; /* Even darker for some elements */
-    --luna-light-purple: #5c557f;
+    --luna-dark-purple: #2c2940;
+    --success-color: #81c784;
+    --success-color-dark: #457b47;
 }
 
 /* --- Base Styles --- */
@@ -39,7 +39,8 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-height: 0; /* Critical for nested flexbox */
+    min-height: 0;
+    position: relative; /* Needed for dropdown positioning */
 }
 
 /* --- Scrollbar --- */
@@ -112,6 +113,71 @@ body {
 .history-item.active .history-item-controls svg { color: white; }
 .pin-btn.pinned svg { color: var(--luna-yellow); }
 
+/* --- Profile Dropdown --- */
+.profile-dropdown-container {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    z-index: 100;
+}
+.profile-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--luna-purple);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease;
+}
+.profile-btn:hover {
+    background-color: var(--luna-dark-purple);
+}
+.profile-dropdown {
+    display: none; /* Hidden by default */
+    position: absolute;
+    top: 50px;
+    right: 0;
+    background-color: var(--sidebar-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    min-width: 200px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    padding: 8px 0;
+    animation: fadeIn 0.1s ease-out;
+}
+.profile-dropdown.show {
+    display: block; /* Shown with JS */
+}
+.dropdown-item {
+    display: block;
+    padding: 10px 15px;
+    color: var(--text-color);
+    text-decoration: none;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+.dropdown-item.red {
+    color: #ff4d4d;
+}
+.dropdown-item:hover {
+    background-color: var(--user-msg-bg);
+}
+.dropdown-divider {
+    height: 1px;
+    background-color: var(--border-color);
+    margin: 8px 0;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* --- Messages Area --- */
 .messages-wrapper {
     flex-grow: 1;
@@ -120,6 +186,9 @@ body {
     display: flex;
     flex-direction: column;
 }
+
+
+
 .welcome-screen { text-align: center; margin: auto; color: var(--secondary-text-color); }
 .welcome-logo { width: 120px; height: 120px; margin-bottom: 20px; }
 .welcome-screen h3 { color: var(--text-color); font-weight: 500; margin-bottom: 10px; }
@@ -142,33 +211,23 @@ body {
     margin-right: auto;
 }
 
+/* HIDE THE AVATARS */
 .avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 0.9em;
-    flex-shrink: 0;
+    display: none; 
 }
-.user-message .avatar {
-    background-color: var(--luna-purple);
-    color: white;
-    margin-left: 15px;
-    order: 2;
+/* Adjust message content alignment now that avatars are gone */
+.user-message .message-content {
+    margin-left: auto; 
 }
-.luna-message .avatar {
-    background-color: var(--sidebar-bg);
-    color: var(--text-color);
-    margin-right: 15px;
+.luna-message .message-content {
+    margin-right: auto;
 }
+/* END OF CHANGES */
 
 .bubble-wrapper {
     display: flex;
     flex-direction: column;
-    min-width: 250px; /* THE CRITICAL FIX: Allows this flex item to shrink */
+    min-width: 250px;
 }
 .message-content {
     padding: 12px 18px;
@@ -236,24 +295,84 @@ body {
 .message-content code { background-color: #202225; padding: 3px 6px; border-radius: 4px; font-family: 'Courier New', Courier, monospace; }
 
 /* --- Copy Code Button --- */
-.code-block-wrapper { position: relative; }
-.copy-code-btn { position: absolute; top: 8px; right: 8px; background-color: var(--user-msg-bg); color: var(--secondary-text-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; font-size: 0.85em; font-weight: 500; cursor: pointer; opacity: 0; transition: opacity 0.2s ease, background-color 0.2s ease; display: flex; align-items: center; gap: 6px; }
-.code-block-wrapper:hover .copy-code-btn { opacity: 1; }
-.copy-code-btn:hover { background-color: #3c3f45; }
-.copy-code-btn svg { width: 14px; height: 14px; }
-.copy-code-btn.copied { background-color: #248046; color: white; }
+.code-block-wrapper { 
+    position: relative; 
+}
+.copy-code-btn { 
+    position: absolute; 
+    top: 8px; 
+    right: 8px; 
+    background-color: var(--user-msg-bg); 
+    color: var(--secondary-text-color); 
+    border: 1px solid var(--border-color); 
+    border-radius: 6px; 
+    padding: 6px 10px; 
+    font-size: 0.85em; 
+    font-weight: 500; 
+    cursor: pointer; 
+    opacity: 0; 
+    transition: opacity 0.2s ease, background-color 0.2s ease; 
+    display: flex; 
+    align-items: center; 
+    gap: 6px; 
+}
+.code-block-wrapper:hover .copy-code-btn { 
+    opacity: 1; 
+}
+.copy-code-btn:hover { 
+    background-color: #3c3f45; 
+}
+.copy-code-btn svg { 
+    width: 14px; /* This correctly sizes the icon */
+    height: 14px; 
+}
+.copy-code-btn.copied { 
+    background-color: #248046; 
+    color: white; 
+}
 
 /* --- Message Actions (Copy Text) --- */
-.message-actions { display: flex; gap: 8px; padding-top: 8px; opacity: 0; transition: opacity 0.2s ease; }
-.luna-message:hover .message-actions { opacity: 1; }
-.luna-message.latest-luna-message .message-actions { opacity: 1; }
-.action-btn { background-color: var(--user-msg-bg); border: 1px solid var(--border-color); color: var(--secondary-text-color); border-radius: 6px; padding: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s ease; }
-.action-btn:hover { background-color: #3c3f45; color: var(--text-color); }
-.action-btn svg { width: 16px; height: 16px; }
-.action-btn.copied { color: #248046; border-color: #248046; }
+.message-actions { 
+    display: flex; 
+    gap: 8px; 
+    padding-top: 8px; 
+    opacity: 0; 
+    transition: opacity 0.2s ease; 
+}
+.luna-message:hover .message-actions { 
+    opacity: 1; 
+}
+/* This class was missing, which is why the button didn't appear on the last message */
+.luna-message.latest-luna-message .message-actions {
+    opacity: 1;
+}
+.action-btn { 
+    background-color: var(--user-msg-bg); 
+    border: 1px solid var(--border-color); 
+    color: var(--secondary-text-color); 
+    border-radius: 6px; 
+    padding: 6px; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    transition: background-color 0.2s ease; 
+}
+.action-btn:hover { 
+    background-color: #3c3f45; 
+    color: var(--text-color); 
+}
+.action-btn svg { 
+    width: 16px; 
+    height: 16px; 
+}
+.action-btn.copied { 
+    color: #248046; 
+    border-color: #248046; 
+}
 
 /* --- Message Editing --- */
-.edit-btn { position: absolute; left: -45px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; background-color: var(--chat-bg); border: 1px solid var(--border-color); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s ease; z-index: 10; }
+.edit-btn { position: absolute; left: -45px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; background-color: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s ease; z-index: 10; }
 .user-message:hover .edit-btn { opacity: 1; }
 .edit-btn:hover { background-color: var(--user-msg-bg); }
 .edit-btn svg { width: 18px; height: 18px; color: var(--secondary-text-color); }
@@ -263,7 +382,7 @@ body {
 .edit-controls .save-btn { background-color: var(--luna-purple); color: white; margin-right: 8px; }
 .edit-controls .cancel-btn { background-color: var(--user-msg-bg); color: var(--text-color); }
 
-/* --- Image Upload Styles --- */
+/* --- File Upload Styles --- */
 .attach-btn {
     background: none;
     border: none;
@@ -312,12 +431,142 @@ body {
 }
 
 
+/* --- Chat Header --- */
+.chat-header {
+    display: none; /* Add this line to hide it by default */
+    padding: 20px 20px 10px 20px;
+    text-align: center;
+    flex-shrink: 0; 
+    opacity: 0.7; 
+    border-bottom: 1px solid var(--border-color);
+}
+.chat-header h3 {
+    margin: 0;
+    font-weight: 500;
+    color: var(--text-color);
+    font-size: 1.2em;
+}
+.chat-header .acronym {
+    font-weight: 700;
+    color: var(--luna-yellow);
+}
 
 
+/* --- Settings Modal --- */
+.modal-overlay {
+    display: none; /* Hidden by default */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 2000;
+}
+.modal-overlay.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-content {
+    background-color: var(--sidebar-bg);
+    padding: 25px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    width: 90%;
+    max-width: 550px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+}
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.4em;
+    color: var(--text-color);
+}
+.close-modal-btn {
+    background: none;
+    border: none;
+    color: var(--secondary-text-color);
+    font-size: 2em;
+    cursor: pointer;
+    line-height: 1;
+}
+.modal-body {
+    overflow-y: auto;
+    padding-right: 10px; /* Space for scrollbar */
+}
+.form-group {
+    margin-bottom: 25px;
+}
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text-color);
+}
+.form-group p {
+    font-size: 0.85em;
+    color: var(--secondary-text-color);
+    margin: 0 0 10px 0;
+}
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: var(--primary-bg);
+    color: var(--text-color);
+    font-family: inherit;
+    font-size: 1em;
+}
+.form-group textarea {
+    resize: vertical;
+}
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    border-top: 1px solid var(--border-color);
+    padding-top: 20px;
+    margin-top: 10px;
+}
 
 
+.save-btn {
+    padding: 8px 20px;
+    background-color: var(--success-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+}
 
+.save-btn:hover {
+    background-color: var(--success-color-dark);
+}
 
+.save-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.save-btn.hidden {
+    display: none;
+}
 
 /* --- Responsive Mobile Design --- */
 .menu-toggle-btn { display: none; }
@@ -330,7 +579,39 @@ body {
     .messages-wrapper { padding-top: 60px; }
     .input-area-container { max-width: 100%; padding: 0 10px 10px 10px; }
     .sidebar.is-dragging {
-    transition: none;
+        transition: none;
+    }
+
+    .message {
+        max-width: 95%;
+    }
+
+    .bubble-wrapper {
+        min-width: 0;
+    }
+
+    .message-content {
+        max-width: 100%;
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }
+
+    /* --- Settings Modal Mobile Adjustments --- */
+    .modal-overlay.show {
+        align-items: flex-start;
+        padding-top: 20px;
+    }
+
+    .modal-content {
+        max-height: 80vh;
+        padding: 20px;
+    }
+
+    .modal-header h2 {
+        font-size: 1.25em;
+    }
+
+    .modal-body {
+        padding-right: 5px;
     }
 }
-

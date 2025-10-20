@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - LUNA</title>
+    <link rel="icon" href="{{ url_for('static', filename='images/luna_logo.png') }}" type="image/png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <img src="{{ url_for('static', filename='images/luna_logo.png') }}" alt="LUNA Logo" class="auth-logo">
+            <h2>Create Your LUNA Account</h2>
+
+            <div id="notification" class="notification" style="display: none;"></div>
+
+            <form id="signup-form">
+                <div class="input-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="password" required>
+                        <span class="toggle-password"></span>
+                    </div>
+                </div>
+                <button type="submit" class="auth-btn">Sign Up</button>
+            </form>
+            <p class="switch-form">Already have an account? <a href="/login">Login</a></p>
+        </div>
+    </div>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+    <script>
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDvwyvhIr5y8Ey9MGRtlHcjmFP12_my-Nc",
+            authDomain: "luna-1ac5d.firebaseapp.com",
+            databaseURL: "https://luna-1ac5d-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "luna-1ac5d",
+            storageBucket: "luna-1ac5d.appspot.com",
+            messagingSenderId: "434162021985",
+            appId: "1:434162021985:web:13409bea74b35a7471dc20"
+        };
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+    </script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+</body>
+</html>
