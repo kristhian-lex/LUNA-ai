@@ -1,30 +1,29 @@
-# check_models.py
+import os
 import google.generativeai as genai
 from dotenv import load_dotenv
-import os
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Configure the API key
 try:
-    genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-    print("API Key configured successfully.")
+    # Configure the API key
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        print("ERROR: GOOGLE_API_KEY not found in .env file.")
+    else:
+        genai.configure(api_key=api_key)
+
+        print("Finding available models for generateContent...")
+
+        # List all models that support the 'generateContent' method
+        found_models = False
+        for model in genai.list_models():
+            if 'generateContent' in model.supported_generation_methods:
+                print(f"  - {model.name}")
+                found_models = True
+
+        if not found_models:
+            print("No models supporting 'generateContent' were found. Your API key may be invalid or restricted.")
+
 except Exception as e:
-    print(f"Error configuring API Key: {e}")
-    exit()
-
-print("\n--- Available Models for 'generateContent' ---")
-# List all models and find the ones that support the 'generateContent' method
-found_model = False
-for m in genai.list_models():
-  if 'generateContent' in m.supported_generation_methods:
-    print(f"Model name: {m.name}")
-    found_model = True
-
-if not found_model:
-    print("\nNo models supporting 'generateContent' were found for your API key.")
-    print("Please check the following:")
-    print("1. Is the 'Generative Language API' enabled in your Google Cloud project?")
-    print("2. Is your API key valid and without restrictions?")
-    print("3. Are you in a supported region for Gemini models?")
+    print(f"An error occurred: {e}")

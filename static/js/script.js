@@ -9,12 +9,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const newChatBtn = document.getElementById('new-chat-btn');
     const chatHistoryList = document.getElementById('chat-history-list');
     const typingIndicator = document.getElementById('typing-indicator');
+    const listeningIndicator = document.getElementById('listening-indicator');
     const menuToggleBtn = document.getElementById('menu-toggle-btn');
     const attachBtn = document.getElementById('attach-btn');
     const fileUploadInput = document.getElementById('file-upload-input');
     const imagePreviewContainer = document.getElementById('image-preview-container');
     const imagePreview = document.getElementById('image-preview');
     const removeImageBtn = document.getElementById('remove-image-btn');
+    const micBtn = document.getElementById('mic-btn');
 
     // Elements for profile dropdown
     const profileBtn = document.getElementById('profile-btn');
@@ -700,6 +702,87 @@ body.addEventListener('touchend', (e) => {
             body.classList.add('sidebar-open');
         }
     }
+});
+
+// --- Speech Recognition Logic ---
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition;
+
+if (SpeechRecognition) {
+    micBtn.style.display = 'flex'; // Show the button if API is supported
+    recognition = new SpeechRecognition();
+    recognition.continuous = false; // Stop after a pause
+    recognition.interimResults = true; // Show results as you speak
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+            .map(result => result[0])
+            .map(result => result.transcript)
+            .join('');
+        
+        messageInput.value = transcript;
+        messageInput.style.height = 'auto';
+        messageInput.style.height = `${messageInput.scrollHeight}px`;
+    };
+
+    recognition.onstart = () => {
+        micBtn.classList.add('is-recording');
+        listeningIndicator.style.display = 'flex';
+    };
+
+    recognition.onend = () => {
+        micBtn.classList.remove('is-recording');
+        listeningIndicator.style.display = 'none';
+        if (messageInput.value.trim()) {
+            sendMessage(); // Automatically send the message when speech ends
+        }
+    };
+
+    recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        micBtn.classList.remove('is-recording');
+        listeningIndicator.style.display = 'none';
+    };
+
+} else {
+    micBtn.style.display = 'none'; // Hide button if browser doesn't support it
+    console.log("Speech Recognition not supported in this browser.");
+}
+
+micBtn.addEventListener('click', () => {
+    // Check if it's already recording by checking the class
+    if (micBtn.classList.contains('is-recording')) {
+        recognition.stop();
+        return; // Exit the function
+    }
+
+    // --- NEW PERMISSION LOGIC ---
+    // Check for microphone permission first
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+            // Permission granted, we can now start recognition
+            console.log("Mic permission granted.");
+            messageInput.value = ''; // Clear input before starting
+            messageInput.placeholder = "Listening..."; // Give visual feedback
+            recognition.start();
+
+            // It's good practice to stop the tracks once recognition is done
+            recognition.onend = () => {
+                stream.getTracks().forEach(track => track.stop()); // Stop the mic access icon
+                micBtn.classList.remove('is-recording');
+                listeningIndicator.style.display = 'none';
+                messageInput.placeholder = "Ask LUNA anything..."; // Reset placeholder
+                if (messageInput.value.trim()) {
+                    sendMessage();
+                }
+            };
+        })
+        .catch(err => {
+            // Permission denied or other error
+            console.error("Mic permission denied:", err);
+            addMessage('luna', 'Microphone access was denied. Please allow it in your browser settings to use voice input.', 'error-mic');
+        });
 });
 
     // --- Initial App Load ---

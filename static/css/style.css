@@ -9,6 +9,7 @@
     --luna-msg-bg: #5a5e63;
     --luna-purple: #3e3860;
     --luna-yellow: #f8e18c;
+    --luna-yellow-dark: #d4b94f;
     --luna-dark-purple: #2c2940;
     --success-color: #81c784;
     --success-color-dark: #457b47;
@@ -372,15 +373,84 @@ body {
 }
 
 /* --- Message Editing --- */
-.edit-btn { position: absolute; left: -45px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; background-color: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s ease; z-index: 10; }
+.edit-btn { 
+    position: absolute; 
+    left: -45px; 
+    top: 50%; 
+    transform: translateY(-50%); 
+    width: 32px; 
+    height: 32px; 
+    background-color: var(--primary-bg); 
+    border: 1px solid var(--border-color); 
+    border-radius: 50%; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    opacity: 0; 
+    transition: opacity 0.2s ease; 
+    z-index: 10; 
+}
 .user-message:hover .edit-btn { opacity: 1; }
 .edit-btn:hover { background-color: var(--user-msg-bg); }
 .edit-btn svg { width: 18px; height: 18px; color: var(--secondary-text-color); }
-.edit-area { width: 100%; display: flex; flex-direction: column; gap: 8px; }
-.edit-area textarea { width: 100%; min-height: 50px; padding: 10px; border-radius: 8px; border: 1px solid var(--luna-purple); font-family: inherit; font-size: 1em; resize: vertical; background-color: var(--user-msg-bg); color: var(--text-color); }
-.edit-controls button { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; }
-.edit-controls .save-btn { background-color: var(--luna-purple); color: white; margin-right: 8px; }
-.edit-controls .cancel-btn { background-color: var(--user-msg-bg); color: var(--text-color); }
+
+/* This is the new, improved styling for the edit area */
+.edit-area { 
+    width: 100%; 
+    background-color: var(--luna-purple); /* Match user message color */
+    border-radius: 8px; /* Match user message radius */
+    padding: 12px 18px; /* Match user message padding */
+    display: flex; 
+    flex-direction: column; 
+    gap: 12px; /* Increased gap for better spacing */
+    box-sizing: border-box; /* Ensures padding is included in width */
+}
+.edit-area textarea { 
+    width: 100%; 
+    min-height: 50px; 
+    padding: 10px; 
+    border-radius: 6px; /* Slightly smaller radius for the input field */
+    border: 1px solid var(--luna-dark-purple); 
+    font-family: inherit; 
+    font-size: 1em; 
+    resize: vertical; 
+    background-color: var(--luna-dark-purple); /* Darker purple for contrast */
+    color: var(--text-color); 
+    box-sizing: border-box; /* Ensures padding is included in width */
+}
+.edit-area textarea:focus {
+    outline: 2px solid var(--luna-yellow);
+    border-color: var(--luna-yellow);
+}
+.edit-controls {
+    display: flex;
+    justify-content: flex-end; /* Align buttons to the right */
+    gap: 8px; /* Add space between buttons */
+}
+.edit-controls button { 
+    padding: 6px 14px; 
+    border: none; 
+    border-radius: 5px; 
+    cursor: pointer; 
+    font-weight: 500; 
+    font-size: 0.9em;
+    transition: background-color 0.2s ease;
+}
+.edit-controls .save-btn { 
+    background-color: var(--luna-yellow); /* Green for save */
+    color: black; 
+}
+.edit-controls .save-btn:hover {
+    background-color: var(--luna-yellow-dark);
+}
+.edit-controls .cancel-btn { 
+    background-color: var(--user-msg-bg); 
+    color: var(--text-color); 
+}
+.edit-controls .cancel-btn:hover {
+    background-color: #3c3f45;
+}
 
 /* --- File Upload Styles --- */
 .attach-btn {
@@ -567,6 +637,30 @@ body {
 .save-btn.hidden {
     display: none;
 }
+
+
+/* --- ADD THIS NEW SECTION FOR THE MICROPHONE BUTTON --- */
+#mic-btn.is-recording {
+    color: #ff4d4d; /* Red color when recording */
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 77, 77, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 77, 77, 0);
+    }
+}
+
+
+
+
+
 
 /* --- Responsive Mobile Design --- */
 .menu-toggle-btn { display: none; }

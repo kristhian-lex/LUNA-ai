@@ -180,21 +180,21 @@ def chat():
     extracted_text = ""
     file_info = {}
     is_image = False
+    file_content = None
 
-    if file:
+    if file and file.filename:
         filename = file.filename
-        file_stream = io.BytesIO(file.read())
-        file.seek(0)
+        file_content = file.read()
         file_info = {'filename': filename, 'type': file.mimetype}
         
         if file.mimetype and file.mimetype.startswith('image/'):
             is_image = True
         elif filename.endswith('.pdf'):
-            extracted_text = extract_text_from_pdf(file_stream)
+            extracted_text = extract_text_from_pdf(io.BytesIO(file_content))
         elif filename.endswith('.docx'):
-            extracted_text = extract_text_from_docx(file_stream)
+            extracted_text = extract_text_from_docx(io.BytesIO(file_content))
         elif file.mimetype and (file.mimetype.startswith('text/') or filename.endswith('.txt')):
-            extracted_text = file_stream.read().decode('utf-8', errors='ignore')
+            extracted_text = file_content.decode('utf-8', errors='ignore')
         else:
             extracted_text = f"Unsupported file type: {filename}. Please upload a PDF, DOCX, image, or TXT file."
 
@@ -209,10 +209,8 @@ def chat():
     user_message = {"id": current_timestamp, "role": "user", "parts": [user_message_text]}
     if file_info:
         user_message['file'] = file_info
-        if is_image:
-            file.seek(0)
-            img_bytes = file.read()
-            user_message['image'] = f"data:{file_info['type']};base64," + base64.b64encode(img_bytes).decode('utf-8')
+        if is_image and file_content:
+            user_message['image'] = f"data:{file_info['type']};base64," + base64.b64encode(file_content).decode('utf-8')
 
     full_history = history + [user_message]
     chat_ref = chats_ref.child(chat_id)
@@ -222,20 +220,21 @@ def chat():
             model = None
             api_content = None
             
+            api_history = format_history_for_api(history)
+            
             if is_image:
-                model = genai.GenerativeModel('gemini-pro-vision', system_instruction=dynamic_personality)
-                file.seek(0)
-                img = Image.open(file)
-                api_content = [user_message_text, img]
+                model = genai.GenerativeModel('models/gemini-2.5-flash-image-preview', system_instruction=dynamic_personality)
+                img = Image.open(io.BytesIO(file_content))
+                # Combine history with the new image and text message
+                api_content = api_history + [{'role': 'user', 'parts': [user_message_text, img]}]
             else:
                 model = genai.GenerativeModel('gemini-pro-latest', system_instruction=dynamic_personality)
                 prompt_text = user_message_text
                 if extracted_text:
-                    prompt_text = f"Based on the following document content... User Question: {user_message_text}"
+                    prompt_text = f"Based on the content of '{file_info.get('filename')}', the user asks: {user_message_text}\n\nDocument Content:\n{extracted_text}"
                 
-                api_history = format_history_for_api(history)
-                api_history.append({'role': 'user', 'parts': [prompt_text]})
-                api_content = api_history
+                # Combine history with the new text message
+                api_content = api_history + [{'role': 'user', 'parts': [prompt_text]}]
 
             initial_data = {"chat_id": chat_id, "user_message_id": user_message['id']}
             yield f"data: {json.dumps(initial_data)}\n\n"
@@ -257,13 +256,13 @@ def chat():
             chat_ref.child('last_updated').set(current_timestamp)
 
             if is_new_chat:
-                title = (user_message_text[:40] + '...') if user_message_text else f"File: {file.filename}"
+                title = (user_message_text[:40] + '...') if user_message_text else f"File: {file_info.get('filename')}"
                 chat_ref.child('title').set(title)
                 chat_ref.child('pinned').set(False)
                 yield f"data: {json.dumps({'is_new_chat': True})}\n\n"
 
         except Exception as e:
-            print(f"Error in stream: {e}")
+            print(f"Error in stream: {repr(e)}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return Response(generate_stream(), mimetype='text/event-stream')
