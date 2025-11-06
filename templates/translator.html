@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LUNA Voice Translator</title>
+  <link rel="icon" href="{{ url_for('static', filename='images/luna_logo.png') }}" type="image/png">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/translator.css') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <svg style="display: none;">
+    <symbol id="icon-menu" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" /></symbol>
+    <symbol id="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></symbol>
+    <symbol id="icon-edit" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></symbol>
+    <symbol id="icon-delete" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></symbol>
+    <symbol id="icon-pin" viewBox="0 0 20 20" fill="currentColor"><path d="M10.49 2.241a1 1 0 00-1.04-.002L3.72 5.513a1 1 0 00-.72.934V15a1 1 0 001 1h12a1 1 0 001-1V6.447a1 1 0 00-.72-.934L10.49 2.24zM10 12a2 2 0 100-4 2 2 0 000 4z"></path><path d="M4 18a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z"></path></symbol>
+    <symbol id="icon-mic" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
+      <path d="M19 10v1a7 7 0 0 1-14 0v-1h-2v1a9 9 0 0 0 8 8.94V22h-3v2h8v-2h-3v-2.06A9 9 0 0 0 21 11v-1h-2z"></path>
+    </symbol>
+  </svg>
+
+      <div class="sidebar">
+    <div class="sidebar-header">
+      <a href="{{ url_for('index') }}" class="logo-container" style="text-decoration: none; color: inherit;">
+        <img src="{{ url_for('static', filename='images/luna_logo.png') }}" alt="LUNA Logo" class="luna-logo">
+        <h2>LUNA</h2>
+      </a>
+      <a href="{{ url_for('index') }}" id="new-chat-btn" class="new-chat-btn">⊕ New Chat</a>
+    </div>
+    <div class="history-section">
+      <h3>History</h3>
+      <ul id="chat-history-list">
+              </ul>
+    </div>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('translator_page') }}" id="voice-translator-btn" class="new-chat-btn translator-btn active"> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                    <path d="M12 5A7 7 0 0 0 5 12a7 7 0 0 0 7 7"/>
+                    <path d="M12 19a7 7 0 0 0 7-7 7 7 0 0 0-7-7"/>
+                </svg>
+                <span>Voice Translator</span>
+            </a>
+        </div>
+  </div>
+
+      <div class="chat-container">
+    <button id="menu-toggle-btn" class="menu-toggle-btn">
+      <svg><use href="#icon-menu"></use></svg>
+    </button>
+
+    <div class="profile-dropdown-container">
+      <button id="profile-btn" class="profile-btn">
+        You
+      </button>
+      <div id="profile-dropdown" class="profile-dropdown">
+        <a href="#" id="settings-btn" class="dropdown-item">Settings</a>
+        <div class="dropdown-divider"></div>
+        <a href="/logout" class="dropdown-item red">Logout</a>
+      </div>
+    </div>
+
+        <div class="translator-container">
+            <div class="translator-header">
+                <img src="{{ url_for('static', filename='images/luna_logo.png') }}" alt="LUNA Logo" class="welcome-logo">
+                <h1>Voice Translator</h1>
+                <p>Record your voice in any language. LUNA will translate it and speak it back to you, *in your own voice*.</p>
+            </div>
+
+            <div class="translator-controls">
+                <div class="control-group">
+                    <label for="language-select">Translate to:</label>
+                    <select id="language-select" name="language">
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="jap">Japanese</option> <option value="ko">Korean</option>
+                        <option value="zh">Chinese (Simplified)</option> <option value="it">Italian</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="ru">Russian</option>
+                        <option value="ar">Arabic</option>
+                        <option value="hi">Hindi</option>
+                        <option value_tagalog="tl">Tagalog</option>
+                        </select>
+                </div>
+                <button id="record-btn" title="Click to Record">
+                    <svg><use href="#icon-mic"></use></svg>
+                    <span id="record-btn-text">Start Recording</span>
+                </button>
+            </div>
+
+            <div id="translator-status" style="display: none;">
+                <div class="loader"></div>
+                <p id="status-text">Processing... this may take up to a minute.</p>
+            </div>
+
+            <div id="translator-result" style="display: none;">
+                <h3>Translation Result:</h3>
+                <audio id="result-audio" controls></audio>
+                <p id="error-message" style="color: #ff4d4d;"></p>
+            </div>
+        </div>
+
+  </div>
+      <div id="settings-modal-overlay" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Settings</h2>
+        <button id="close-modal-btn" class="close-modal-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="settings-form">
+                    <div class="form-group">
+            <label for="luna-personality">LUNA's Personality</label>
+            <p>Set the style and tone LUNA uses when responding.</p>
+            <select id="luna-personality" name="personality">
+              <option value="Default">Default (Cheerful and adaptive)</option>
+              <option value="Cynic">Cynic (Critical and sarcastic)</option>
+              <option value="Robot">Robot (Efficient and blunt)</option>
+              <option value="Listener">Listener (Thoughtful and supportive)</option>
+              <option value="Nerd">Nerd (Exploratory and enthusiastic)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="custom-instructions">Custom instructions</label>
+            <p>Additional behavior, style, and tone preferences.</p>
+            <textarea id="custom-instructions" name="custom_instructions" rows="4" placeholder="e.g. Write like a human. Keep it professional but conversational. Use lists to organize information."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="user-nickname">About you - Nickname</label>
+            <p>What should LUNA call you?</p>
+            <input type="text" id="user-nickname" name="nickname" placeholder="e.g. Alex">
+          </div>
+
+          <div class="form-group">
+            <label for="user-occupation">Occupation</label>
+            <input type="text" id="user-occupation" name="occupation" placeholder="e.g. Software Developer">
+          </div>
+
+          <div class="form-group">
+            <label for="user-interests">More about you</label>
+            <p>Interests, values, or preferences for LUNA to keep in mind.</p>
+            <textarea id="user-interests" name="interests" rows="4" placeholder="e.g. I'm a big fan of classic sci-fi movies and minimalist design."></textarea>
+          </div>
+          <div class="modal-footer">
+            <span id="settings-save-status"></span>
+            <button type="submit" form="settings-form" class="save-btn">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+      <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+      <script src="{{ url_for('static', filename='js/translator.js') }}"></script>
+</body>
+</html>

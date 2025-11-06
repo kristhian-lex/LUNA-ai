@@ -1,7 +1,18 @@
-# Ignore Python virtual environment
+# Virtual Environment
 venv/
-__pycache__/
 
-# Ignore secret files
+# Python cache
+__pycache__/
+*.pyc
+
+# Temporary Audio Files
+static/temp/
+
+# VS Code settings
+.vscode/
+
+# dotenv file (NEVER commit your API keys)
 .env
+
+# Firebase credentials
 firebase-credentials.json

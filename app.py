@@ -14,6 +14,37 @@ from PIL import Image
 import PyPDF2
 import docx
 from functools import wraps
+import torch
+import gc
+import whisper
+from transformers import pipeline
+from TTS.api import TTS
+from flask import send_file
+import torch.serialization
+import sys
+import librosa
+import soundfile
+
+# --- ADD PYTORCH 2.6+ SECURITY FIX HERE ---
+try:
+    from TTS.tts.configs.xtts_config import XttsConfig
+    from TTS.tts.models.xtts import XttsAudioConfig, XttsArgs
+    from TTS.config.shared_configs import BaseDatasetConfig
+    
+    torch.serialization.add_safe_globals([
+        XttsConfig, 
+        XttsAudioConfig, 
+        BaseDatasetConfig,
+        XttsArgs
+    ])
+    print("Successfully added TTS classes to torch safe globals.", file=sys.stderr)
+
+except ImportError:
+    print("Could not import TTS classes. Make sure the TTS library is installed.", file=sys.stderr)
+except Exception as e:
+    print(f"Error adding TTS classes to torch safe globals: {e}", file=sys.stderr)
+# --- END OF FIX ---
+
 
 # --- Initialization ---
 load_dotenv()
@@ -59,7 +90,7 @@ def format_history_for_api(history):
             role = 'user' if msg['role'] == 'user' else 'model'
             parts = [part for part in msg.get('parts', []) if part]
             if parts:
-                 clean_history.append({'role': role, 'parts': parts})
+                clean_history.append({'role': role, 'parts': parts})
     return clean_history
 
 def get_chat_title(history):
@@ -72,6 +103,156 @@ def get_chat_title(history):
         return title if title else "New Chat"
     except Exception:
         return (history[0]['parts'][0][:30] + '...') if history and history[0].get('parts') else "Chat"
+    
+    # --- VRAM & AI Helper Functions ---
+
+def clear_vram():
+    """Manually clears VRAM by deleting models and running garbage collection."""
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+# --- LOW VRAM OPTIMIZATION ---
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+# Use the 'small' model for better accuracy now that we're on GPU
+WHISPER_MODEL_SIZE = "small"
+# -----------------------------
+
+def translate_and_clone_voice(audio_input_path, audio_output_path, target_lang):
+    """
+    Takes an audio file path and a target language, transcribes,
+    translates, and then synthesizes the translated text in the
+    original speaker's voice, optimized for low VRAM.
+    
+    Returns the path to the output file if successful, otherwise None.
+    """
+    
+    print(f"--- Using device: {DEVICE} ---")
+
+    # --- Step 1: Transcribe Audio with Whisper ---
+    original_text = ""
+    source_lang = ""
+    try:
+        print(f"[1/4] Loading Whisper model ('{WHISPER_MODEL_SIZE}')...")
+        whisper_model = whisper.load_model(WHISPER_MODEL_SIZE, device=DEVICE)
+        
+        print(f"[1/4] Transcribing audio: {audio_input_path}...")
+        transcribe_start = time.time()
+        transcription_result = whisper_model.transcribe(audio_input_path)
+        original_text = transcription_result["text"]
+        source_lang = transcription_result["language"]
+        transcribe_end = time.time()
+        print(f"[1/4] Original Text ({source_lang}): {original_text} (Time: {transcribe_end - transcribe_start:.2f}s)")
+
+    except Exception as e:
+        print(f"Error during Whisper transcription: {e}")
+        return None
+    finally:
+        # --- VRAM CLEAR ---
+        if 'whisper_model' in locals():
+            del whisper_model
+            clear_vram()
+            print("[VRAM Cleared] Unloaded Whisper model.")
+            
+    if not original_text.strip():
+        print("Error: No speech detected in the audio.")
+        return None
+
+    # --- Step 2: Translate Text with Meta NLLB ---
+    translated_text = ""
+    try:
+        print(f"[2/4] Loading Translation model (NLLB)...")
+        print("NOTE: First-time load may take several minutes to download...")
+        
+        FLORES_CODES = {
+            "en": "eng_Latn",
+            "es": "spa_Latn",
+            "ko": "kor_Hang",
+            "zh-CN": "zho_Hans", # Chinese (Simplified)
+            "ja": "jpn_Jpan",    # Japanese
+            "fr": "fra_Latn",    # French
+            "de": "deu_Latn",    # German
+            "ru": "rus_Cyrl"     # Russian
+        }
+
+        if source_lang not in FLORES_CODES:
+            raise Exception(f"Unsupported source language for translation: {source_lang}")
+        if target_lang not in FLORES_CODES:
+            if target_lang == "zh": target_lang = "zh-CN"
+            
+            if target_lang not in FLORES_CODES:
+                raise Exception(f"Unsupported target language for translation: {target_lang}")
+
+        src_code = FLORES_CODES[source_lang]
+        tgt_code = FLORES_CODES[target_lang]
+
+        translator = pipeline(
+            "translation", 
+            model="facebook/nllb-200-distilled-600M", 
+            device=0 if DEVICE == "cuda" else -1
+        )
+
+        print(f"[2/4] Translating text from '{src_code}' to '{tgt_code}'...")
+        translate_start = time.time()
+        
+        translated_text_list = translator(
+            original_text, 
+            src_lang=src_code, 
+            tgt_lang=tgt_code,
+            max_length=1024  # <-- ADDED THIS LINE to fix the "cut off" text
+        )
+        
+        translated_text = translated_text_list[0]['translation_text']
+        translate_end = time.time()
+        print(f"[2/4] Translated Text ({target_lang}): {translated_text} (Time: {translate_end - translate_start:.2f}s)")
+        
+    except Exception as e:
+        print(f"Error: Could not translate text. {e}")
+        return None
+    finally:
+        # --- VRAM CLEAR ---
+        if 'translator' in locals():
+            del translator
+            clear_vram()
+            print("[VRAM Cleared] Unloaded Translation model.")
+
+    # --- Step 3: Clone Voice with Coqui XTTS ---
+    try:
+        print(f"[3/4] Loading XTTS-v2 Voice Cloning model...")
+        
+        tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=(DEVICE == "cuda"))
+        
+        print(f"[3/4] Cloning voice and generating speech...")
+        tts_start = time.time()
+        
+        # XTTS still uses the simple language code (e.g., 'ko'), which is correct.
+        tts.tts_to_file(
+            text=translated_text,
+            speaker_wav=audio_input_path,
+            language=target_lang,
+            file_path=audio_output_path,
+            temperature=0.65, # Makes the model more stable
+            top_k=50,         # <-- ADDED THIS LINE to reduce randomness
+            top_p=0.85        # <-- ADDED THIS LINE to reduce "whisper"
+        )
+        tts_end = time.time()
+        print(f"[3/4] Speech synthesis complete. (Time: {tts_end - tts_start:.2f}s)")
+
+    except Exception as e:
+        print(f"Error during XTTS synthesis: {e}")
+        if "CUDA out of memory" in str(e):
+            print("\n--- FATAL ERROR: CUDA Out of Memory ---")
+        return None
+    finally:
+        # --- VRAM CLEAR ---
+        if 'tts' in locals():
+            del tts
+            clear_vram()
+            print("[VRAM Cleared] Unloaded XTTS model.")
+
+    # --- Step 4: Return Output Path ---
+    print(f"[4/4] Process finished. Output file saved to: {audio_output_path}")
+    return audio_output_path
 
 # --- Auth Routes ---
 @app.route("/login")
@@ -90,6 +271,7 @@ def session_login():
         session['user_id'] = decoded_token['uid']
         return jsonify({"status": "success"})
     except Exception as e:
+        print(f"!!! FIREBASE AUTH VERIFICATION ERROR: {repr(e)}")
         return jsonify({"status": "error", "message": str(e)}), 401
 
 @app.route("/logout")
@@ -135,6 +317,85 @@ def save_settings():
 def index():
     return render_template('index.html')
 
+# --- ADD NEW TRANSLATOR ROUTES HERE ---
+
+@app.route("/translator")
+@login_required
+def translator_page():
+    """Serves the new voice translator page."""
+    return render_template('translator.html')
+
+@app.route('/translate_voice', methods=['POST'])
+@login_required
+def translate_voice_endpoint():
+    """Handles the voice translation AI processing."""
+    if 'audio_data' not in request.files:
+        return jsonify({"error": "No audio file part in the request"}), 400
+
+    file = request.files['audio_data']
+    target_lang = request.form.get('language', 'es') # Default to Spanish if not provided
+
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+
+    # --- Create a temporary directory if it doesn't exist ---
+    temp_dir = os.path.join(app.static_folder, 'temp')
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Create unique filenames to prevent users from overwriting each other
+    user_id = session.get('user_id', 'default_user')
+    unique_id = str(uuid.uuid4())
+    input_filename = f"in_{user_id}_{unique_id}.wav"
+    output_filename = f"out_{user_id}_{unique_id}.wav"
+    
+    input_path = os.path.join(temp_dir, input_filename)
+    output_path = os.path.join(temp_dir, output_filename)
+
+    try:
+        file.save(input_path)
+
+        # --- AUDIO CLEANING FIX V2 (FOR 'DEMONIC' VOICE) ---
+        TARGET_SR = 24000 
+        ORIGINAL_SR_ASSUMPTION = 48000
+        
+        try:
+            audio, sr = librosa.load(input_path, sr=ORIGINAL_SR_ASSUMPTION)
+            audio_resampled = librosa.resample(audio, orig_sr=ORIGINAL_SR_ASSUMPTION, target_sr=TARGET_SR, res_type='kaiser_fast')
+            soundfile.write(input_path, audio_resampled, TARGET_SR, format='WAV', subtype='PCM_16')
+            print(f"Cleaned and resampled audio to {TARGET_SR}Hz (assumed {ORIGINAL_SR_ASSUMPTION}Hz original).")
+            
+        except Exception as e:
+            print(f"Error cleaning audio file: {e}")
+            raise Exception(f"Failed to process audio file: {e}")
+        # --- END OF FIX ---
+        
+        # Call your AI function
+        result_path = translate_and_clone_voice(input_path, output_path, target_lang)
+        
+        if result_path and os.path.exists(result_path):
+            response = send_file(result_path, mimetype='audio/wav')
+            
+            @response.call_on_close
+            def cleanup_files():
+                try:
+                    os.remove(input_path)
+                    os.remove(output_path)
+                    print(f"Cleaned up temp files: {input_filename}, {output_filename}")
+                except Exception as e:
+                    print(f"Error cleaning up temp files: {e}")
+            
+            return response
+        else:
+            raise Exception("AI processing failed to produce an output file.")
+
+    except Exception as e:
+        print(f"Error in /translate_voice: {repr(e)}")
+        if os.path.exists(input_path):
+            os.remove(input_path)
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+# --- END OF NEW ROUTES ---
+
 @app.route("/chat", methods=['POST'])
 @login_required
 def chat():
@@ -151,7 +412,6 @@ def chat():
         personality = settings.get("personality")
         custom_instructions = settings.get("custom_instructions") # Get the new value
 
-        # Add this block to include the custom instructions
         if custom_instructions:
             dynamic_personality += f" Follow these custom instructions from the user: {custom_instructions}."
 
@@ -223,9 +483,8 @@ def chat():
             api_history = format_history_for_api(history)
             
             if is_image:
-                model = genai.GenerativeModel('models/gemini-2.5-flash-image-preview', system_instruction=dynamic_personality)
+                model = genai.GenerativeModel('models/gemini-pro-vision', system_instruction=dynamic_personality)
                 img = Image.open(io.BytesIO(file_content))
-                # Combine history with the new image and text message
                 api_content = api_history + [{'role': 'user', 'parts': [user_message_text, img]}]
             else:
                 model = genai.GenerativeModel('gemini-pro-latest', system_instruction=dynamic_personality)
@@ -233,7 +492,6 @@ def chat():
                 if extracted_text:
                     prompt_text = f"Based on the content of '{file_info.get('filename')}', the user asks: {user_message_text}\n\nDocument Content:\n{extracted_text}"
                 
-                # Combine history with the new text message
                 api_content = api_history + [{'role': 'user', 'parts': [prompt_text]}]
 
             initial_data = {"chat_id": chat_id, "user_message_id": user_message['id']}
@@ -271,7 +529,6 @@ def chat():
 @login_required
 def edit():
     user_id = session['user_id']
-    # You could also load settings here to influence the edit, but we'll keep it simple for now.
     ref = db.reference(f'users/{user_id}/chats') 
     data = request.json
     chat_id, message_id, new_text = data.get('chat_id'), data.get('message_id'), data.get('new_text')
@@ -371,6 +628,22 @@ def pin_chat():
     if not chat_id or pin_status is None: return jsonify({"error": "Missing data"}), 400
     ref.child(chat_id).child('pinned').set(pin_status)
     return jsonify({"success": True})
+    
+@app.route('/update_model', methods=['POST'])
+@login_required
+def update_model():
+    user_id = session['user_id']
+    settings_ref = db.reference(f'users/{user_id}/settings')
+    try:
+        data = request.json
+        model = data.get('model')
+        if not model:
+            return jsonify({"status": "error", "message": "No model specified"}), 400
+            
+        settings_ref.child('model').set(model)
+        return jsonify({"status": "success", "message": f"Model updated to {model}"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

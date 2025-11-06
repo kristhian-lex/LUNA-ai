@@ -1,0 +1,172 @@
+*{
+    text-decoration: none;
+}
+/* --- Styles for translator.html --- */
+.translator-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    padding: 20px;
+    box-sizing: border-box;
+    text-align: center;
+    max-width: 700px;
+    margin: 0 auto;
+    height: 100%;
+}
+
+.translator-header {
+    margin-bottom: 40px;
+}
+
+.translator-header .welcome-logo {
+    width: 100px;
+    height: 100px;
+    margin-bottom: 20px;
+}
+
+.translator-header h1 {
+    color: var(--luna-yellow);
+    font-size: 2em;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.translator-header p {
+    font-size: 1.1em;
+    color: var(--secondary-text-color);
+    max-width: 500px;
+}
+
+.translator-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 25px;
+    margin-bottom: 30px;
+    width: 100%;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.control-group label {
+    font-size: 1.1em;
+    font-weight: 500;
+    color: var(--secondary-text-color);
+}
+
+#language-select {
+    padding: 12px 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background-color: var(--primary-bg);
+    color: var(--text-color);
+    font-family: inherit;
+    font-size: 1em;
+    cursor: pointer;
+}
+
+#language-select:focus {
+    outline: none;
+    border-color: var(--luna-yellow);
+    box-shadow: 0 0 0 3px rgba(248, 225, 140, 0.2);
+}
+
+#record-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-size: 1.1em;
+    font-weight: 500;
+    padding: 15px 30px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    background-color: var(--luna-purple);
+    color: white;
+    transition: all 0.2s ease;
+    width: 250px;
+}
+
+#record-btn:hover {
+    background-color: var(--luna-dark-purple);
+}
+
+#record-btn svg {
+    width: 24px;
+    height: 24px;
+}
+
+#record-btn.is-recording {
+    background-color: #ff4d4d;
+    color: white;
+    animation: pulse 1.5s infinite;
+}
+
+#record-btn:disabled {
+    background-color: var(--user-msg-bg);
+    color: var(--secondary-text-color);
+    cursor: not-allowed;
+}
+
+
+/* --- Status & Result Styles --- */
+#translator-status {
+    display: none; /* Hidden by default */
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+#status-text {
+    font-size: 1em;
+    color: var(--secondary-text-color);
+    font-style: italic;
+}
+
+#translator-result {
+    display: none; /* Hidden by default */
+    width: 100%;
+    margin-top: 20px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 30px;
+}
+
+#translator-result h3 {
+    color: var(--luna-yellow);
+    margin-bottom: 15px;
+}
+
+#result-audio {
+    width: 100%;
+    max-width: 500px;
+}
+
+/* --- Loader Spinner --- */
+.loader {
+    border: 5px solid var(--user-msg-bg);
+    border-top: 5px solid var(--luna-yellow);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* --- Active state for translator button in sidebar --- */
+.translator-btn.active {
+    background-color: var(--luna-purple) !important;
+    color: white;
+    border-color: var(--luna-purple);
+}

@@ -658,7 +658,31 @@ body {
 }
 
 
+/* --- Styles for New Translator Button in Sidebar --- */
+.sidebar-footer {
+    padding: 20px;
+    margin-top: auto; /* Pushes this section to the bottom */
+    border-top: 1px solid var(--border-color);
+}
 
+.translator-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background-color: var(--user-msg-bg) !important; /* Use a different color */
+    border: 1px solid var(--border-color);
+    text-decoration: none;
+}
+
+.translator-btn:hover {
+    background-color: #3c3f45 !important;
+    border-color: var(--luna-yellow);
+}
+
+.translator-btn svg {
+    flex-shrink: 0;
+}
 
 
 
