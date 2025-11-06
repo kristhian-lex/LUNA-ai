@@ -13,7 +13,7 @@ torchvision
 torchaudio
 openai-whisper
 transformers
-TTS
+coqui-tts
 librosa
 soundfile
 resampy
