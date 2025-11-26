@@ -24,6 +24,12 @@ import torch.serialization
 import sys
 import librosa
 import soundfile
+import warnings
+from gtts import gTTS
+
+# --- Suppress Specific Warnings ---
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning, module="whisper")
 
 # --- ADD PYTORCH 2.6+ SECURITY FIX HERE ---
 try:
@@ -120,138 +126,159 @@ WHISPER_MODEL_SIZE = "small"
 
 def translate_and_clone_voice(audio_input_path, audio_output_path, target_lang):
     """
-    Takes an audio file path and a target language, transcribes,
-    translates, and then synthesizes the translated text in the
-    original speaker's voice, optimized for low VRAM.
-    
-    Returns the path to the output file if successful, otherwise None.
+    Hybrid System:
+    - Uses XTTS (Voice Cloning) for supported languages.
+    - Uses gTTS (Google Translate Voice) for Tagalog/Hindi/Unsupported languages.
     """
     
-    print(f"--- Using device: {DEVICE} ---")
+    print(f"--- Using device: {DEVICE} ---", flush=True)
 
     # --- Step 1: Transcribe Audio with Whisper ---
     original_text = ""
     source_lang = ""
     try:
-        print(f"[1/4] Loading Whisper model ('{WHISPER_MODEL_SIZE}')...")
+        print(f"[1/4] Loading Whisper model ('{WHISPER_MODEL_SIZE}')...", flush=True)
         whisper_model = whisper.load_model(WHISPER_MODEL_SIZE, device=DEVICE)
         
-        print(f"[1/4] Transcribing audio: {audio_input_path}...")
+        print(f"[1/4] Transcribing audio: {audio_input_path}...", flush=True)
         transcribe_start = time.time()
         transcription_result = whisper_model.transcribe(audio_input_path)
         original_text = transcription_result["text"]
         source_lang = transcription_result["language"]
         transcribe_end = time.time()
-        print(f"[1/4] Original Text ({source_lang}): {original_text} (Time: {transcribe_end - transcribe_start:.2f}s)")
+        print(f"[1/4] Original Text ({source_lang}): {original_text} (Time: {transcribe_end - transcribe_start:.2f}s)", flush=True)
 
     except Exception as e:
-        print(f"Error during Whisper transcription: {e}")
+        print(f"Error during Whisper transcription: {e}", flush=True)
         return None
     finally:
-        # --- VRAM CLEAR ---
         if 'whisper_model' in locals():
             del whisper_model
             clear_vram()
-            print("[VRAM Cleared] Unloaded Whisper model.")
+            print("[VRAM Cleared] Unloaded Whisper model.", flush=True)
             
     if not original_text.strip():
-        print("Error: No speech detected in the audio.")
+        print("Error: No speech detected in the audio.", flush=True)
         return None
 
     # --- Step 2: Translate Text with Meta NLLB ---
     translated_text = ""
     try:
-        print(f"[2/4] Loading Translation model (NLLB)...")
-        print("NOTE: First-time load may take several minutes to download...")
+        print(f"[2/4] Loading Translation model (NLLB)...", flush=True)
         
+        # --- MAP YOUR HTML VALUES TO NLLB CODES HERE ---
         FLORES_CODES = {
-            "en": "eng_Latn",
-            "es": "spa_Latn",
+            # Standard & Your HTML Values
+            "en": "eng_Latn", 
+            "es": "spa_Latn", 
+            "fr": "fra_Latn", 
+            "de": "deu_Latn",
             "ko": "kor_Hang",
-            "zh-CN": "zho_Hans", # Chinese (Simplified)
-            "ja": "jpn_Jpan",    # Japanese
-            "fr": "fra_Latn",    # French
-            "de": "deu_Latn",    # German
-            "ru": "rus_Cyrl"     # Russian
+            "ru": "rus_Cyrl",
+            "zh": "zho_Hans",    # Your HTML 'zh'
+            "zh-CN": "zho_Hans", # Standard
+            "jap": "jpn_Jpan",   # Your HTML 'jap' -> Japanese
+            "ja": "jpn_Jpan",    # Standard
+            "it": "ita_Latn",    # Italian
+            "pt": "por_Latn",    # Portuguese
+            "ar": "arb_Arab",    # Arabic
+            "hi": "hin_Deva",    # Hindi
+            "tl": "tgl_Latn",    # Tagalog
+            "Tagalog": "tgl_Latn"
         }
 
+        # Check source lang (Whisper usually returns standard codes like 'ja', 'en')
+        # We might need to map whisper 'ja' to Flores 'ja' (which exists above)
+        if source_lang == "ja": source_lang = "ja" # direct map
+        
         if source_lang not in FLORES_CODES:
-            raise Exception(f"Unsupported source language for translation: {source_lang}")
+            # Fallback for common mismatches
+            if source_lang == "jw": source_lang = "en" # Whisper sometimes mistakes silence for Javanese, default to En
+            elif source_lang not in FLORES_CODES:
+                 raise Exception(f"Unsupported source language for translation: {source_lang}")
+        
         if target_lang not in FLORES_CODES:
-            if target_lang == "zh": target_lang = "zh-CN"
-            
-            if target_lang not in FLORES_CODES:
-                raise Exception(f"Unsupported target language for translation: {target_lang}")
+            raise Exception(f"Unsupported target language for translation: {target_lang}")
 
         src_code = FLORES_CODES[source_lang]
         tgt_code = FLORES_CODES[target_lang]
 
-        translator = pipeline(
-            "translation", 
-            model="facebook/nllb-200-distilled-600M", 
-            device=0 if DEVICE == "cuda" else -1
-        )
+        translator = pipeline("translation", model="facebook/nllb-200-distilled-600M", device=0 if DEVICE == "cuda" else -1)
 
-        print(f"[2/4] Translating text from '{src_code}' to '{tgt_code}'...")
+        print(f"[2/4] Translating text from '{src_code}' to '{tgt_code}'...", flush=True)
         translate_start = time.time()
         
-        translated_text_list = translator(
-            original_text, 
-            src_lang=src_code, 
-            tgt_lang=tgt_code,
-            max_length=1024  # <-- ADDED THIS LINE to fix the "cut off" text
-        )
-        
+        translated_text_list = translator(original_text, src_lang=src_code, tgt_lang=tgt_code, max_length=1024)
         translated_text = translated_text_list[0]['translation_text']
         translate_end = time.time()
-        print(f"[2/4] Translated Text ({target_lang}): {translated_text} (Time: {translate_end - translate_start:.2f}s)")
+        print(f"[2/4] Translated Text ({target_lang}): {translated_text} (Time: {translate_end - translate_start:.2f}s)", flush=True)
         
     except Exception as e:
-        print(f"Error: Could not translate text. {e}")
+        print(f"Error: Could not translate text. {e}", flush=True)
         return None
     finally:
-        # --- VRAM CLEAR ---
         if 'translator' in locals():
             del translator
             clear_vram()
-            print("[VRAM Cleared] Unloaded Translation model.")
+            print("[VRAM Cleared] Unloaded Translation model.", flush=True)
 
-    # --- Step 3: Clone Voice with Coqui XTTS ---
+    # --- Step 3: Synthesis (Hybrid: XTTS vs gTTS) ---
     try:
-        print(f"[3/4] Loading XTTS-v2 Voice Cloning model...")
+        # Languages supported by Coqui XTTS v2 for Voice Cloning
+        # We need to map your HTML codes (jap, zh) to XTTS codes (ja, zh-cn)
+        XTTS_MAP = {
+            "en": "en", "es": "es", "fr": "fr", "de": "de", 
+            "it": "it", "pt": "pt", "pl": "pl", "tr": "tr", 
+            "ru": "ru", "nl": "nl", "cs": "cs", "ar": "ar", 
+            "hu": "hu", "ko": "ko",
+            "zh": "zh-cn", "zh-cn": "zh-cn", # Map 'zh' to 'zh-cn'
+            "jap": "ja", "ja": "ja"          # Map 'jap' to 'ja'
+        }
         
-        tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=(DEVICE == "cuda"))
-        
-        print(f"[3/4] Cloning voice and generating speech...")
-        tts_start = time.time()
-        
-        # XTTS still uses the simple language code (e.g., 'ko'), which is correct.
-        tts.tts_to_file(
-            text=translated_text,
-            speaker_wav=audio_input_path,
-            language=target_lang,
-            file_path=audio_output_path,
-            temperature=0.65, # Makes the model more stable
-            top_k=50,         # <-- ADDED THIS LINE to reduce randomness
-            top_p=0.85        # <-- ADDED THIS LINE to reduce "whisper"
-        )
-        tts_end = time.time()
-        print(f"[3/4] Speech synthesis complete. (Time: {tts_end - tts_start:.2f}s)")
+        # Determine the code to use for XTTS
+        xtts_lang_code = XTTS_MAP.get(target_lang)
 
-    except Exception as e:
-        print(f"Error during XTTS synthesis: {e}")
-        if "CUDA out of memory" in str(e):
-            print("\n--- FATAL ERROR: CUDA Out of Memory ---")
-        return None
-    finally:
-        # --- VRAM CLEAR ---
-        if 'tts' in locals():
+        if xtts_lang_code:
+            # --- USE XTTS (VOICE CLONING) ---
+            print(f"[3/4] Language '{target_lang}' (mapped to '{xtts_lang_code}') supported by XTTS. Cloning user voice...", flush=True)
+            tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=(DEVICE == "cuda"))
+            
+            tts_start = time.time()
+            tts.tts_to_file(
+                text=translated_text,
+                speaker_wav=audio_input_path,
+                language=xtts_lang_code, 
+                file_path=audio_output_path,
+                temperature=0.65, top_k=50, top_p=0.85
+            )
+            tts_end = time.time()
+            
             del tts
             clear_vram()
-            print("[VRAM Cleared] Unloaded XTTS model.")
+            print(f"[3/4] XTTS Synthesis complete. (Time: {tts_end - tts_start:.2f}s)", flush=True)
+
+        else:
+            # --- USE GOOGLE TTS (FALLBACK) ---
+            # Used for: Hindi (hi), Tagalog (tl), etc.
+            print(f"[3/4] Language '{target_lang}' NOT supported by XTTS. Using Google TTS...", flush=True)
+            
+            tts_start = time.time()
+            # Map HTML codes to gTTS codes if needed
+            gtts_lang = target_lang
+            if target_lang == "Tagalog": gtts_lang = "tl"
+            
+            tts_google = gTTS(text=translated_text, lang=gtts_lang)
+            tts_google.save(audio_output_path)
+            
+            tts_end = time.time()
+            print(f"[3/4] Google TTS Synthesis complete. (Time: {tts_end - tts_start:.2f}s)", flush=True)
+
+    except Exception as e:
+        print(f"Error during Speech Synthesis: {e}", flush=True)
+        return None
 
     # --- Step 4: Return Output Path ---
-    print(f"[4/4] Process finished. Output file saved to: {audio_output_path}")
+    print(f"[4/4] Process finished. Output file saved to: {audio_output_path}", flush=True)
     return audio_output_path
 
 # --- Auth Routes ---
@@ -271,7 +298,7 @@ def session_login():
         session['user_id'] = decoded_token['uid']
         return jsonify({"status": "success"})
     except Exception as e:
-        print(f"!!! FIREBASE AUTH VERIFICATION ERROR: {repr(e)}")
+        print(f"!!! FIREBASE AUTH VERIFICATION ERROR: {repr(e)}", flush=True)
         return jsonify({"status": "error", "message": str(e)}), 401
 
 @app.route("/logout")
@@ -356,16 +383,17 @@ def translate_voice_endpoint():
 
         # --- AUDIO CLEANING FIX V2 (FOR 'DEMONIC' VOICE) ---
         TARGET_SR = 24000 
-        ORIGINAL_SR_ASSUMPTION = 48000
         
         try:
-            audio, sr = librosa.load(input_path, sr=ORIGINAL_SR_ASSUMPTION)
-            audio_resampled = librosa.resample(audio, orig_sr=ORIGINAL_SR_ASSUMPTION, target_sr=TARGET_SR, res_type='kaiser_fast')
-            soundfile.write(input_path, audio_resampled, TARGET_SR, format='WAV', subtype='PCM_16')
-            print(f"Cleaned and resampled audio to {TARGET_SR}Hz (assumed {ORIGINAL_SR_ASSUMPTION}Hz original).")
+            # Load with librosa, letting it decide between soundfile or audioread automatically
+            # The previous 'sr=None' was causing some issues, so we load at TARGET_SR directly if possible
+            # or load native and resample.
+            audio, _ = librosa.load(input_path, sr=TARGET_SR)
+            soundfile.write(input_path, audio, TARGET_SR, format='WAV', subtype='PCM_16')
+            print(f"Cleaned and resampled audio to {TARGET_SR}Hz.", flush=True)
             
         except Exception as e:
-            print(f"Error cleaning audio file: {e}")
+            print(f"Error cleaning audio file: {e}", flush=True)
             raise Exception(f"Failed to process audio file: {e}")
         # --- END OF FIX ---
         
@@ -380,18 +408,21 @@ def translate_voice_endpoint():
                 try:
                     os.remove(input_path)
                     os.remove(output_path)
-                    print(f"Cleaned up temp files: {input_filename}, {output_filename}")
+                    print(f"Cleaned up temp files: {input_filename}, {output_filename}", flush=True)
                 except Exception as e:
-                    print(f"Error cleaning up temp files: {e}")
+                    print(f"Error cleaning up temp files: {e}", flush=True)
             
             return response
         else:
             raise Exception("AI processing failed to produce an output file.")
 
     except Exception as e:
-        print(f"Error in /translate_voice: {repr(e)}")
+        print(f"Error in /translate_voice: {repr(e)}", flush=True)
         if os.path.exists(input_path):
-            os.remove(input_path)
+            try:
+                os.remove(input_path)
+            except:
+                pass
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 # --- END OF NEW ROUTES ---
@@ -520,7 +551,7 @@ def chat():
                 yield f"data: {json.dumps({'is_new_chat': True})}\n\n"
 
         except Exception as e:
-            print(f"Error in stream: {repr(e)}")
+            print(f"Error in stream: {repr(e)}", flush=True)
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return Response(generate_stream(), mimetype='text/event-stream')
